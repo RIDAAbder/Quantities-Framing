@@ -17,7 +17,7 @@ namespace QuantitiesAndFraming
             RevitUi.AddRibbonTab(a, tabName);
             var FramingPanel = RevitUi.AddRibbonPanel(a, tabName, "Framing");
 
-            var FramingBtn = RevitUi.AddPushButton(FramingPanel, "Process DWG", typeof(Frame), Properties.Resources.Wall, Properties.Resources.Wall, typeof(AvailableIfOpenDoc));
+            var FramingBtn = RevitUi.AddPushButton(FramingPanel, "Frame Wall", typeof(Frame), Properties.Resources.Wall, Properties.Resources.Wall, typeof(AvailableIfOpenDoc));
 
             FramingBtn.ToolTip = "Click to create framings for wall";
 

@@ -66,7 +66,7 @@ namespace QuantitiesAndFramingLibrary
 
             XElement XElementAddIn = new XElement("AddIn", new XAttribute("Type", "Application"));
 
-            XElementAddIn.Add(new XElement("Name", myAddinDLL));
+            XElementAddIn.Add(new XElement("Name", "Quantities And Framing"));
             XElementAddIn.Add(new XElement("Assembly", this.Context.Parameters["targetdir"].Trim() + myAddinDLL + ".dll"));  // /TargetDir=value1 /
             XElementAddIn.Add(new XElement("AddInId", Guid.NewGuid().ToString())); //DatabaseMethods.writeDebug(Guid.NewGuid().ToString());
             XElementAddIn.Add(new XElement("FullClassName", myAddinDLL + ".App"));
