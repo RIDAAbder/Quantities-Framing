@@ -29,19 +29,18 @@ namespace QuantitiesAndFraming
             ElementId face_Id;
 
             var wallFilter = new WallFilter();
-            var wallselection_reference = uidoc.Selection.PickObject(ObjectType.Element, wallFilter);
+            var wallselection_reference = uidoc.Selection.PickObject(ObjectType.Element, wallFilter, "Select the wall you want to frame") ;
             wall_Id = wallselection_reference.ElementId;
-
-            var faceFilter = new FaceFilter();
-            var faceselection_reference = uidoc.Selection.PickObject(ObjectType.Element, faceFilter);
-            face_Id = faceselection_reference.ElementId;
-
 
             if (wall_Id == null || wall_Id == ElementId.InvalidElementId)
             {
                 TaskDialog.Show("Selection Error", "Invalid element is selected. Please try again.");
                 return Result.Cancelled;
             }
+
+            var faceFilter = new FaceFilter();
+            var faceselection_reference = uidoc.Selection.PickObject(ObjectType.Element, faceFilter,"Select the face of the wall");
+            face_Id = faceselection_reference.ElementId;         
 
             if (face_Id == null || face_Id == ElementId.InvalidElementId)
             {
@@ -62,27 +61,7 @@ namespace QuantitiesAndFraming
 
                 parametersList.Sort();
 
-                var bbox = selectedWall.get_BoundingBox(doc.ActiveView);
-
-
-                var pt0 = new XYZ(bbox.Min.X, bbox.Min.Y, bbox.Min.Z);
-                var pt1 = new XYZ(bbox.Max.X, bbox.Min.Y, bbox.Min.Z);
-                var pt2 = new XYZ(bbox.Max.X, bbox.Max.Y, bbox.Min.Z);
-                var pt3 = new XYZ(bbox.Min.X, bbox.Max.Y, bbox.Min.Z);
-
-
-                var edge0 = Line.CreateBound(pt0, pt1);
-                var edge1 = Line.CreateBound(pt1, pt2);
-                var edge2 = Line.CreateBound(pt2, pt3);
-                var edge3 = Line.CreateBound(pt3, pt0);
-
-
-                var edges = new List<Curve>();
-
-                edges.Add(edge0);
-                edges.Add(edge1);
-                edges.Add(edge2);
-                edges.Add(edge3);
+                var edges = selectedWall.GetElementCurves(doc);
 
                 tx.Commit();
                 
