@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>Application QuantitiesAndFraming</Name>
+    <Assembly>QuantitiesAndFraming.dll</Assembly>
+    <FullClassName>QuantitiesAndFraming.App</FullClassName>
+    <ClientId>6db9ff9b-40b4-4a3b-851e-c19ea1147409</ClientId>
+    <VendorId>Matechi</VendorId>
+    <VendorDescription>info@matechi.com</VendorDescription>
+  </AddIn>
+</RevitAddIns>
