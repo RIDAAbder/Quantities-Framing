@@ -13,13 +13,22 @@ namespace QuantitiesAndFraming
 {
     class FaceFilter : ISelectionFilter
     {
+        Document doc = null;
+        public FaceFilter(Document document)
+        {
+            doc = document;
+        }
         public bool AllowElement(Element e)
         {
-            return (e.GetType().Equals(typeof(Face)));
+            return true;
         }
 
         public bool AllowReference(Reference reference, XYZ position)
         {
+            if (doc.GetElement(reference).GetGeometryObjectFromReference(reference) is PlanarFace)
+            {
+                return true; 
+            }
             return false;
         }
     }

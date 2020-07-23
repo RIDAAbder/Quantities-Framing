@@ -28,6 +28,9 @@ namespace QuantitiesAndFraming
             ElementId wall_Id = null;
             ElementId face_Id = null;
             PlanarFace planarFace = null;
+
+            var levels = Helpers.FindAndSortLevels(doc);
+
             try
             {
                 var wallFilter = new WallFilter();
@@ -36,26 +39,19 @@ namespace QuantitiesAndFraming
             }
             catch (Exception)
             {
-
-            }
-
-            if (wall_Id == null || wall_Id == ElementId.InvalidElementId)
-            {
-                TaskDialog.Show("Selection Error", "Invalid element is selected. Please try again.");
                 return Result.Cancelled;
             }
-
+            
             try
             {
-                var faceFilter = new FaceFilter();
-                var faceselection_reference = uidoc.Selection.PickObject(ObjectType.Face, faceFilter, "Select the face of the wall. ESC for cancel.");
+                var faceselection_reference = uidoc.Selection.PickObject(ObjectType.Element,new FaceFilter(doc), "Select the face of the wall. ESC for cancel.");
                 face_Id = faceselection_reference.ElementId;
                 GeometryObject geoObject = doc.GetElement(faceselection_reference).GetGeometryObjectFromReference(faceselection_reference);
                 planarFace = geoObject as PlanarFace;
             }
             catch (Exception)
             {
-
+                return Result.Cancelled;
             }
 
             if (face_Id == null || face_Id == ElementId.InvalidElementId)
@@ -64,17 +60,36 @@ namespace QuantitiesAndFraming
                 return Result.Cancelled;
             }
 
+            if (wall_Id == null || wall_Id == ElementId.InvalidElementId)
+            {
+                TaskDialog.Show("Selection Error", "Invalid element is selected. Please try again.");
+                return Result.Cancelled;
+            }
+
             var selectedWall = doc.GetElement(wall_Id);
             var selectedFace = doc.GetElement(face_Id);
+
+            var structuralColumn = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_StructuralColumns)
+                .Where(o => Helpers.GetParameterValue(o.LookupParameter("Width")).Equals(Helpers.GetParameterValue(selectedWall.LookupParameter("Width"))))
+                .FirstOrDefault();
+
+            var structuralFraming = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_StructuralFraming)
+                .FirstOrDefault();
+
+
             using (var tx = new Transaction(doc, "Frame Walls"))
             {
                 tx.Start("Frame Walls");
-                var parametersList = new List<List<string>>()
+                var parametersList = new List<double>()
                 {
-                    new List<string>(){Helpers.GetParameterValue(selectedWall.LookupParameter("Width")),Helpers.GetParameterValue( selectedWall.LookupParameter("Height")) },
-                    new List<string>(){Helpers.GetParameterValue(selectedWall.LookupParameter("Type")) }
+                    selectedWall.LookupParameter("Width").AsDouble(),
+                     selectedWall.LookupParameter("Height").AsDouble()
+                    
                 };
-
+                var widths = new List<double>()
+                {
+                    selectedWall.LookupParameter("Width").AsDouble()
+                };
                 parametersList.Sort();
 
                 var edges = selectedWall.GetElementCurves(doc);
@@ -102,6 +117,34 @@ namespace QuantitiesAndFraming
                     curvesGroupedByLenghts.Add(lenght, list);
                 }
 
+                var curves = curvesGroupedByLenghts.Values.Select(o => o).ToList();
+                var keys = curvesGroupedByLenghts.Keys.Select(o => o).ToList();
+                var curvesLenghts = new List<List<double>>();
+                     
+                var lines = new List<List<Curve>>();
+                var linesLenght = new List<List<double>>();
+
+                for (int i = 0; i < curvesLenghts.Count; i++)
+                {
+                    var list = curvesLenghts[i];          
+                    var subLines = new List<Curve>();
+                    var curve = curves[i];
+
+                    for (int k = 0; k < list.Count; k++)
+                    {
+                        var c = Math.Round(0.5 * (list[k] - parametersList[k]) / keys[k], 7);
+                    
+                        subLines.Add(Line.CreateBound(curve[i].PointAtParameter(c), curve[i].PointAtParameter(1 - c)));
+                    }
+
+                    lines.Add(subLines);
+
+                    linesLenght.Add(subLines.Select(o => o.Length).ToList());
+                }
+                // the two list that i am going to compare 
+
+                var lenghtsList = linesLenght.SelectMany(o => o).Distinct().ToList().Select(o => Math.Round(o, 2)).ToList() ;
+                // the second list is widths 
 
                 tx.Commit();
 

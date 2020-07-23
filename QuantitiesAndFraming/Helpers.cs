@@ -111,12 +111,18 @@ namespace QuantitiesAndFraming
             XYZ q = p - d * plane.Normal;
             return q;
         }
-
         internal static double SignedDistanceTo(this Plane plane,XYZ p)
         {
         
             XYZ v = p - plane.Origin;
             return plane.Normal.DotProduct(v);
+        }
+        public static XYZ PointAtParameter(this Curve curve , double p)
+        {
+            var start = curve.GetEndPoint(0);
+            var end = curve.GetEndPoint(1);
+
+            return new XYZ(start.X + (end.X - start.X) * p, start.Y + (end.Y - start.Y) * p, start.Z + (end.Z - start.Z) * p);
         }
     }
 }
