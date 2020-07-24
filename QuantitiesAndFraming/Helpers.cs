@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Autodesk.Revit.DB;
+using Autodesk.Revit.DB.Structure;
 
 namespace QuantitiesAndFraming
 {
@@ -11,6 +12,7 @@ namespace QuantitiesAndFraming
     {
         public static string GetParameterValue(Parameter p)
         {
+            if (null == p) return "";
             switch (p.StorageType)
             {
                 case StorageType.Double:
@@ -101,10 +103,10 @@ namespace QuantitiesAndFraming
             }
             return list;
         }
-        public static Curve ProjectOntoCurve(this Plane plane,Curve curve)
+        public static Curve ProjectOntoCurve(this Plane plane, Curve curve)
         {
             return Line.CreateBound(plane.ProjectOnto(curve.GetEndPoint(0)), plane.ProjectOnto(curve.GetEndPoint(1)));
-       }
+        }
         internal static XYZ ProjectOnto( this Plane plane,XYZ p)
         {
             double d = plane.SignedDistanceTo(p);
@@ -123,6 +125,27 @@ namespace QuantitiesAndFraming
             var end = curve.GetEndPoint(1);
 
             return new XYZ(start.X + (end.X - start.X) * p, start.Y + (end.Y - start.Y) * p, start.Z + (end.Z - start.Z) * p);
+        }
+        public static List<Level> FindAndSortLevels(Document doc)
+        {
+            return new FilteredElementCollector(doc)
+            .WherePasses(new ElementClassFilter(typeof(Level), false))
+            .Cast<Level>()
+            .OrderBy(e => e.Elevation).ToList() ;
+        }
+        public static FamilyInstance CreateFraming(Document document,List<Curve> curves, Level level,FamilySymbol familySymbol,int i)
+        {
+
+            return document.Create
+                  .NewFamilyInstance(curves[i], familySymbol, level, StructuralType.Beam);
+
+        }
+        public static FamilyInstance CreateColumn(Document document, List<Curve> curves, Level level, FamilySymbol familySymbol, int i)
+        {
+
+            return document.Create
+                 .NewFamilyInstance(curves[i], familySymbol, level, StructuralType.Column);
+
         }
     }
 }

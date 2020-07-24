@@ -24,12 +24,11 @@ namespace QuantitiesAndFraming
             UIDocument uidoc = uiapp.ActiveUIDocument;
             Application app = uiapp.Application;
             Document doc = uidoc.Document;
+            View view = doc.ActiveView;
 
             ElementId wall_Id = null;
             ElementId face_Id = null;
             PlanarFace planarFace = null;
-
-            var levels = Helpers.FindAndSortLevels(doc);
 
             try
             {
@@ -44,7 +43,7 @@ namespace QuantitiesAndFraming
             
             try
             {
-                var faceselection_reference = uidoc.Selection.PickObject(ObjectType.Element,new FaceFilter(doc), "Select the face of the wall. ESC for cancel.");
+                var faceselection_reference = uidoc.Selection.PickObject(ObjectType.Face , new FaceFilter(doc), "Select the face of the wall. ESC for cancel.");
                 face_Id = faceselection_reference.ElementId;
                 GeometryObject geoObject = doc.GetElement(faceselection_reference).GetGeometryObjectFromReference(faceselection_reference);
                 planarFace = geoObject as PlanarFace;
@@ -67,29 +66,45 @@ namespace QuantitiesAndFraming
             }
 
             var selectedWall = doc.GetElement(wall_Id);
-            var selectedFace = doc.GetElement(face_Id);
+
+            if (selectedWall.LookupParameter("Width") == null || selectedWall.LookupParameter("Height") == null)
+            {
+                TaskDialog.Show("Parameter Error", "The selected Element is invalid, Please try again.");
+                return Result.Cancelled;
+            }
 
             var structuralColumn = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_StructuralColumns)
                 .Where(o => Helpers.GetParameterValue(o.LookupParameter("Width")).Equals(Helpers.GetParameterValue(selectedWall.LookupParameter("Width"))))
                 .FirstOrDefault();
 
+            var structuralColumnSymbol = (structuralColumn as FamilyInstance).Symbol;
+
             var structuralFraming = new FilteredElementCollector(doc).OfCategory(BuiltInCategory.OST_StructuralFraming)
                 .FirstOrDefault();
 
+            var structuralFramingSymbol = (structuralFraming as FamilyInstance).Symbol;
 
-            using (var tx = new Transaction(doc, "Frame Walls"))
+            var level = Helpers.FindAndSortLevels(doc).FirstOrDefault(o => o.Id.Equals(selectedWall.LevelId));
+
+            
+
+            var parametersList = new List<double>()
             {
-                tx.Start("Frame Walls");
-                var parametersList = new List<double>()
-                {
-                    selectedWall.LookupParameter("Width").AsDouble(),
-                     selectedWall.LookupParameter("Height").AsDouble()
-                    
-                };
-                var widths = new List<double>()
-                {
-                    selectedWall.LookupParameter("Width").AsDouble()
-                };
+                 selectedWall.LookupParameter("Width").AsDouble(),
+                 selectedWall.LookupParameter("Height").AsDouble()
+            };
+
+            var widths = new List<double>()
+            {
+                 selectedWall.LookupParameter("Width").AsDouble()
+            };
+              
+
+            using (var tx = new Transaction(doc, "Frame Wall"))
+            {
+                tx.Start("Frame Wall");
+                
+                
                 parametersList.Sort();
 
                 var edges = selectedWall.GetElementCurves(doc);
@@ -99,11 +114,11 @@ namespace QuantitiesAndFraming
                 var plan = Plane.CreateByNormalAndOrigin(normal, origin);
 
                 var projectedCurves = edges.Select(o => plan.ProjectOntoCurve(o)).ToList();
-                var curveLenghts = projectedCurves.Select(o => o.Length).ToList();
+                var projectedCurvesLenghts = projectedCurves.Select(o => o.Length).ToList();
 
                 var curvesGroupedByLenghts = new Dictionary<double, List<Curve>>();
 
-                foreach (var lenght in curveLenghts)
+                foreach (var lenght in projectedCurvesLenghts)
                 {
                     var list = new List<Curve>();
                     foreach (var curve in projectedCurves)
@@ -138,13 +153,71 @@ namespace QuantitiesAndFraming
                     }
 
                     lines.Add(subLines);
-
                     linesLenght.Add(subLines.Select(o => o.Length).ToList());
                 }
-                // the two list that i am going to compare 
 
-                var lenghtsList = linesLenght.SelectMany(o => o).Distinct().ToList().Select(o => Math.Round(o, 2)).ToList() ;
-                // the second list is widths 
+                var mask = new List<List<bool>>();
+
+                var InList = new List<List<Curve>>();
+                var OutList = new List<List<Curve>>();
+
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    var subInList = new List<Curve>();
+                    var SubOutList = new List<Curve>();
+
+                    var linesList = lines[i];
+                    var linesLenghtsList = linesLenght[i];
+
+                    for (int k = 0; k < linesList.Count; k++)
+                    {
+                        if (linesLenghtsList[k] == widths[0])
+                        {
+                            subInList.Add(linesList[k]);
+                        }
+                        else
+                        {
+                            SubOutList.Add(linesList[k]);
+                        }
+                    }
+
+                    InList.Add(subInList);
+                    OutList.Add(SubOutList);
+                }
+                var CleanedInList = InList.Where(o => o.Count != 0 || o.Contains(null)).ToList();
+                var CleanedOutList = OutList.Where(o => o.Count != 0 || o.Contains(null)).ToList();
+
+                var FlattenedCleanedInList = CleanedInList.SelectMany(o => o).ToList();
+                var FlattenedCleanedOutList = CleanedOutList.SelectMany(o => o).ToList();
+
+                var InDictionnary = new List<Curve>();
+                var OutDictionnary = new List<Curve>();
+
+                foreach (var curve in FlattenedCleanedInList)
+                {
+                    InDictionnary.Add(curve);
+                }
+
+                foreach (var curve in FlattenedCleanedOutList)
+                {
+                    if (curve.GetEndPoint(0).Z > curve.GetEndPoint(1).Z)
+                    {
+                        OutDictionnary.Add(curve.CreateReversed());
+                    }
+                    else
+                    {
+                        OutDictionnary.Add(curve);
+                    }
+                }
+
+                var range = Enumerable.Range(1, OutDictionnary.Count).ToList();
+
+                foreach (var i in range)
+                {
+                    var framing = Helpers.CreateFraming(doc, FlattenedCleanedInList, level, structuralFramingSymbol,i);
+                    var column = Helpers.CreateColumn(doc, FlattenedCleanedOutList, level, structuralColumnSymbol,i);
+                }
+               
 
                 tx.Commit();
 
